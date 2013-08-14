@@ -93,7 +93,7 @@
 
 (defn diff-f [f x]
   (let [e (new Object)]
-    (f/fmap #(get (:perturbations %) e) (f (->D x {e 1})))))
+    (map #(get (:perturbations %) e) (f (->D x {e 1})))))
 
 (defn diff-f' [f x]
   [(f x) (diff-f f x)])
@@ -118,10 +118,26 @@
 (defn grad' [f x & xs]
   [(apply f x xs) (apply grad f x xs)])
 
-(defn curve [x]
-  (div (m/pow x 2) 4))
+(defn gradient-descent [f x0 & xs0]
+  (letfn [(step [[x fx gx step-size i]]
+            (cond (zero? step-size) nil
+                  (every? zero? gx) nil
+                  :else
+                  (let [x' (map (fn [xi gxi]
+                                  (- xi (* step-size gxi)))
+                                x gx)
+                        [fx' gx'] (apply grad' f x')]
+                    (cond (> fx' fx)
+                          (recur [x fx gx (/ step-size 2) 0])
+                          (= i 10)
+                          [x' fx' gx' (* step-size 2) 0]
+                          :else
+                          [x' fx' gx' step-size (inc i)]))))]
+    (let [[fx gx] (apply grad' f x0 xs0)]
+      (map first
+           (take-while (complement nil?)
+                       (iterate step [(cons x0 xs0) fx gx 0.1 0]))))))
 
-(defn reflect [x]
-  (let [[y y'] (diff' curve x)]
-    (a/+ y (div (a/* x (a/- (reciprocal y') y')) 2))))
-
+(defn rosenbrock [x y]
+  (a/+ (m/pow (a/- 1 x) 2)
+       (a/* 100 (m/pow (a/- y (m/pow x 2)) 2))))
